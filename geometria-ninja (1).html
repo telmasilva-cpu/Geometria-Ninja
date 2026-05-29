@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Geometria Ninja – 8º Ano | BNCC EF08MA15</title>
+<meta name="description" content="Jogo educativo de Geometria Plana para o 8º Ano. Área, perímetro, ângulos e figuras planas. BNCC EF08MA15."/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0612;font-family:'DM Sans',sans-serif;overflow-x:hidden}
+#root{min-height:100vh}
+input::placeholder{color:#554}
+button:active{transform:scale(0.96)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#111}
+::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.bg-geo{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;opacity:0.06}
+@keyframes floatGeo{0%{transform:translateY(110vh) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:.5}100%{transform:translateY(-10vh) rotate(360deg);opacity:0}}
+@keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes pop{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.slide-up{animation:slideUp 0.4s ease forwards}
+.shake{animation:shake 0.4s ease}
+.pop{animation:pop 0.3s ease forwards}
+</style>
+</head>
+<body>
+<div class="bg-geo" id="bgGeo"></div>
+<div id="root"></div>
+<script>
+// Figuras geométricas flutuando no fundo
+const bg=document.getElementById('bgGeo');
+const shapes=['▲','■','⬡','◆','●','△','□','⬟'];
+for(let i=0;i<16;i++){
+  const s=document.createElement('div');
+  s.textContent=shapes[Math.floor(Math.random()*shapes.length)];
+  const size=Math.random()*32+16;
+  s.style.cssText=`position:absolute;font-size:${size}px;left:${Math.random()*100}%;color:#a78bfa;animation:floatGeo ${Math.random()*14+8}s linear ${Math.random()*8}s infinite`;
+  bg.appendChild(s);
+}
+</script>
+<script type="text/babel">
+const{useState,useEffect,useCallback}=React;
+
+const VERSICULOS=[
+  {ref:"Eclesiastes 9.10",txt:"\"Tudo o que você tiver de fazer, faça-o com toda a sua força; porque no além, para onde você vai, não há obra, nem projeto, nem conhecimento, nem sabedoria.\""},
+  {ref:"Colossenses 3.23", txt:"\"E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.\""},
+  {ref:"Provérbios 9.10",  txt:"\"O temor do SENHOR é o princípio da sabedoria, e o conhecimento do Santo é entendimento.\""},
+];
+
+const BNCC={
+  codigo:"EF08MA15",
+  habilidade:"Construir e justificar os critérios de semelhança de triângulos, utilizando-os na resolução de problemas; calcular medidas de ângulos, áreas e perímetros de figuras planas.",
+  objeto:"Geometria plana: ângulos, áreas, perímetros e figuras geométricas planas",
+  campo:"Geometria",unidade:"Geometria",
+  ano:"8º Ano – Ensino Fundamental (Anos Finais)",
+};
+
+const CREDITS={
+  nome:"Telma Antonia Alves da Silva",
+  curso:"Licenciatura em Matemática – EaD",
+  disciplina:"Estágio Supervisionado II",
+  orientador:"Prof. Orientador: Bruno Coelho",
+  regente:"Prof. Regente: Lillian Tavares",
+  nivel:"Ensino Fundamental – Anos Finais | 8º Ano",
+};
+
+const LEVELS=[
+  {name:"Fácil",  timeLimit:45,points:10,label:"Conceitos básicos"},
+  {name:"Médio",  timeLimit:35,points:20,label:"Cálculos intermediários"},
+  {name:"Difícil",timeLimit:25,points:30,label:"Problemas avançados"},
+];
+
+const TEMAS=[
+  {id:"area",    label:"Área",      color:"#a78bfa", emoji:"📐"},
+  {id:"perimetro",label:"Perímetro",color:"#34d399", emoji:"📏"},
+  {id:"angulos", label:"Ângulos",   color:"#fbbf24", emoji:"📐"},
+  {id:"figuras", label:"Figuras",   color:"#f472b6", emoji:"🔷"},
+];
+
+function ri(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function round2(n){return Math.round(n*100)/100;}
+
+// ── BANCO DE QUESTÕES ─────────────────────────────────────────
+function gerarQuestao(level,tema){
+  const lv=level;
+  let enunciado,resposta,choices,emoji,tipo;
+
+  if(tema==="area"){
+    const fig=ri(0,4);
+    if(fig===0){
+      // Quadrado
+      const l=ri(lv===0?2:lv===1?5:8, lv===0?8:lv===1?15:25);
+      enunciado=`Qual é a área de um quadrado com lado ${l} cm?`;
+      resposta=l*l; emoji="◼"; tipo="calc";
+    } else if(fig===1){
+      // Retângulo
+      const b=ri(lv===0?2:4,lv===0?8:15),h=ri(lv===0?2:4,lv===0?8:12);
+      enunciado=`Qual é a área de um retângulo com base ${b} cm e altura ${h} cm?`;
+      resposta=b*h; emoji="▬"; tipo="calc";
+    } else if(fig===2){
+      // Triângulo
+      const b=ri(4,lv===0?10:20),h=ri(2,lv===0?8:16);
+      enunciado=`Qual é a área de um triângulo com base ${b} cm e altura ${h} cm?`;
+      resposta=round2((b*h)/2); emoji="▲"; tipo="calc";
+    } else if(fig===3){
+      // Problema contextualizado
+      const l=ri(3,lv===0?8:14);
+      enunciado=`Uma sala de aula tem formato quadrado com ${l} m de lado. Quantos m² tem a sala?`;
+      resposta=l*l; emoji="🏫"; tipo="problem";
+    } else {
+      const b=ri(4,12),h=ri(3,10);
+      enunciado=`Um jardim retangular tem ${b} m de comprimento e ${h} m de largura. Qual é sua área?`;
+      resposta=b*h; emoji="🌳"; tipo="problem";
+    }
+  } else if(tema==="perimetro"){
+    const fig=ri(0,4);
+    if(fig===0){
+      const l=ri(lv===0?2:5,lv===0?10:20);
+      enunciado=`Qual é o perímetro de um quadrado com lado ${l} cm?`;
+      resposta=4*l; emoji="◼"; tipo="calc";
+    } else if(fig===1){
+      const b=ri(3,lv===0?10:18),h=ri(2,lv===0?8:14);
+      enunciado=`Qual é o perímetro de um retângulo com base ${b} cm e altura ${h} cm?`;
+      resposta=2*(b+h); emoji="▬"; tipo="calc";
+    } else if(fig===2){
+      const a=ri(3,10),b=ri(3,10),c=ri(3,10);
+      enunciado=`Qual é o perímetro de um triângulo com lados ${a} cm, ${b} cm e ${c} cm?`;
+      resposta=a+b+c; emoji="▲"; tipo="calc";
+    } else if(fig===3){
+      const l=ri(4,12);
+      enunciado=`Um campo de futebol americano quadrado tem ${l} m de lado. Qual é o perímetro do campo?`;
+      resposta=4*l; emoji="⚽"; tipo="problem";
+    } else {
+      const b=ri(5,15),h=ri(3,10);
+      enunciado=`Uma piscina retangular tem ${b} m de comprimento e ${h} m de largura. Qual é o perímetro da piscina?`;
+      resposta=2*(b+h); emoji="🏊"; tipo="problem";
+    }
+  } else if(tema==="angulos"){
+    const q=ri(0,5);
+    if(q===0){
+      const a=ri(20,80);
+      enunciado=`Dois ângulos são suplementares. Se um deles mede ${a}°, qual é o outro?`;
+      resposta=180-a; emoji="📐"; tipo="calc";
+    } else if(q===1){
+      const a=ri(10,70);
+      enunciado=`Dois ângulos são complementares. Se um deles mede ${a}°, qual é o outro?`;
+      resposta=90-a; emoji="📐"; tipo="calc";
+    } else if(q===2){
+      const a=ri(30,100),b=ri(20,80);
+      const c=180-a-b;
+      if(c>0){
+        enunciado=`Em um triângulo, dois ângulos medem ${a}° e ${b}°. Qual é o terceiro ângulo?`;
+        resposta=c; emoji="▲"; tipo="calc";
+      } else {
+        enunciado=`Qual é a soma dos ângulos internos de um triângulo?`;
+        resposta=180; emoji="▲"; tipo="calc";
+      }
+    } else if(q===3){
+      enunciado=`Qual é a soma dos ângulos internos de um quadrilátero?`;
+      resposta=360; emoji="◼"; tipo="calc";
+    } else if(q===4){
+      const a=ri(25,75);
+      enunciado=`Uma régua forma um ângulo de ${a}° com a mesa. Qual é o ângulo suplementar?`;
+      resposta=180-a; emoji="📏"; tipo="problem";
+    } else {
+      const a=ri(20,60),b=ri(20,60);
+      const c=180-a-b;
+      if(c>0){
+        enunciado=`Um triângulo tem ângulos de ${a}° e ${b}°. Qual é o terceiro ângulo?`;
+        resposta=c; emoji="▲"; tipo="problem";
+      } else {
+        enunciado=`Qual é o valor de cada ângulo de um triângulo equilátero?`;
+        resposta=60; emoji="▲"; tipo="calc";
+      }
+    }
+  } else {
+    // FIGURAS — conceitos e classificações
+    const q=ri(0,7);
+    const questoes=[
+      {e:"Quantos lados tem um hexágono?",         r:6,  em:"⬡", t:"calc"},
+      {e:"Quantos lados tem um pentágono?",         r:5,  em:"⬠", t:"calc"},
+      {e:"Quantos lados tem um octógono?",          r:8,  em:"⬡", t:"calc"},
+      {e:"Quantos lados tem um quadrilátero?",      r:4,  em:"◼", t:"calc"},
+      {e:"Quantos ângulos tem um triângulo?",       r:3,  em:"▲", t:"calc"},
+      {e:"Qual é a soma dos ângulos de um pentágono?", r:540, em:"⬠",t:"calc"},
+      {e:"Qual é a soma dos ângulos de um hexágono?",  r:720, em:"⬡",t:"calc"},
+      {e:"Quantos lados iguais tem um triângulo equilátero?", r:3, em:"▲",t:"calc"},
+    ];
+    const q2=questoes[Math.min(q,questoes.length-1)];
+    enunciado=q2.e; resposta=q2.r; emoji=q2.em; tipo=q2.t;
+  }
+
+  // Gerar alternativas
+  const ws=[];let att=0;
+  while(ws.length<3&&att<60){
+    att++;
+    const delta=ri(1,Math.max(2,Math.floor(resposta*0.4)||3));
+    const sign=Math.random()<0.5?1:-1;
+    const w=round2(resposta+sign*delta);
+    if(w!==resposta&&w>0&&!ws.includes(w))ws.push(w);
+  }
+  const ch=[...ws,resposta].sort(()=>Math.random()-0.5);
+
+  return{enunciado,resposta,choices:ch,emoji,tipo,tema};
+}
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────
+const LS_KEY="geometriaNinja_historico";
+function loadHistorico(){try{return JSON.parse(localStorage.getItem(LS_KEY)||"[]");}catch{return[];}}
+function saveHistorico(h){try{localStorage.setItem(LS_KEY,JSON.stringify(h));}catch{}}
+function clearHistorico(){try{localStorage.removeItem(LS_KEY);}catch{}}
+
+// ── IMPRESSÃO ─────────────────────────────────────────────────
+function doPrint({studentName,finalScore,correctCount,wrongCount,maxStreak,level,selTemas,history,TOTAL,date}){
+  date=date||new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+  const pct=Math.round((correctCount/TOTAL)*100);
+  const nota=(correctCount/TOTAL)*10;
+  const medal=nota>=9?"🏆 Excelente":nota>=7?"🥈 Muito Bom":nota>=5?"🥉 Bom":"💪 Em Desenvolvimento";
+  const temasUsados=selTemas.map(t=>TEMAS.find(x=>x.id===t)?.label).join(", ");
+  const rows=history.map((h,i)=>{
+    const tInfo=TEMAS.find(t=>t.id===h.tema);
+    return`<tr style="background:${i%2===0?"#f8fafc":"#fff"}">
+      <td style="padding:7px 10px;text-align:center;font-weight:700">${i+1}</td>
+      <td style="padding:7px 10px"><span style="background:${tInfo?.color||"#a78bfa"}22;color:${tInfo?.color||"#a78bfa"};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${tInfo?.emoji||"📐"} ${tInfo?.label||""}</span></td>
+      <td style="padding:7px 10px;font-size:12px">${h.tipo==="problem"?`<em>${h.enunciado}</em>`:h.enunciado}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:800;color:#6d28d9">${h.resposta}</td>
+      <td style="padding:7px 10px;text-align:center;font-size:16px">${h.result==="correct"?"✅":"❌"}</td>
+    </tr>`;
+  }).join("");
+  const win=window.open("","_blank");
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Resultado – Geometria Ninja 8º Ano</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#fff;color:#1e293b;padding:32px;max-width:750px;margin:0 auto}
+.header{text-align:center;border-bottom:3px solid #7c3aed;padding-bottom:14px;margin-bottom:20px}
+h1{font-size:22px;font-weight:900;color:#7c3aed;font-family:'Syne',sans-serif}
+.sub{color:#64748b;font-size:12px}
+.section{margin-bottom:18px}
+h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#94a3b8;margin:0 0 8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 14px}
+.box .lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}
+.box .val{font-size:17px;font-weight:800;color:#1e293b;margin-top:2px;font-family:'Syne',sans-serif}
+.big{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#4c1d95,#7c3aed,#a78bfa);color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:16px}
+.big .pts{font-size:48px;font-weight:900;line-height:1;font-family:'Syne',sans-serif}
+.big .medal{font-size:17px;font-weight:700;margin-bottom:3px}
+.big .sub2{font-size:11px;opacity:.8}.big .nota{font-size:13px;margin-top:5px;opacity:.9}
+.bncc{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:11px;padding:13px}
+.code{display:inline-block;background:#7c3aed;color:#fff;font-weight:800;font-size:12px;padding:3px 10px;border-radius:99px;margin-bottom:6px;font-family:'Syne',sans-serif}
+.bt{font-size:11px;color:#475569;line-height:1.6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:#7c3aed;color:#fff}
+th{padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700}
+td{border-bottom:1px solid #e2e8f0;vertical-align:middle}
+.footer-p{border-top:2px solid #e2e8f0;padding-top:12px;margin-top:22px;text-align:center;font-size:11px;color:#94a3b8;line-height:1.8}
+.sname{font-size:19px;font-weight:800;font-family:'Syne',sans-serif}
+.signature{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.sign-box{text-align:center;border-top:1px solid #94a3b8;padding-top:8px;font-size:11px;color:#475569}
+@media print{body{padding:14px}}
+</style></head><body>
+<div class="header">
+  <div style="font-size:38px;margin-bottom:4px">📐</div>
+  <h1>Geometria Ninja – 8º Ano</h1>
+  <div class="sub">Relatório de Desempenho · ${date}</div>
+</div>
+<div class="section"><h3>Identificação</h3>
+  <div class="box"><div class="lbl">Nome</div><div class="sname">${studentName}</div></div>
+</div>
+<div class="big">
+  <div class="pts">${finalScore}</div>
+  <div><div class="medal">${medal}</div><div class="sub2">pontos obtidos</div><div class="nota">Nota: ${nota.toFixed(1)} / 10,0</div></div>
+</div>
+<div class="section"><h3>Desempenho</h3>
+  <div class="grid3">
+    <div class="box"><div class="lbl">Acertos</div><div class="val" style="color:#16a34a">${correctCount} ✅</div></div>
+    <div class="box"><div class="lbl">Erros</div><div class="val" style="color:#dc2626">${wrongCount} ❌</div></div>
+    <div class="box"><div class="lbl">Aproveitamento</div><div class="val" style="color:${pct>=70?"#16a34a":pct>=50?"#d97706":"#dc2626"}">${pct}%</div></div>
+  </div>
+  <div class="grid2" style="margin-top:8px">
+    <div class="box"><div class="lbl">Nível</div><div class="val">${LEVELS[level].name}</div></div>
+    <div class="box"><div class="lbl">Sequência máx.</div><div class="val">${maxStreak} 🔥</div></div>
+    <div class="box"><div class="lbl">Temas praticados</div><div class="val" style="font-size:11px">${temasUsados}</div></div>
+    <div class="box"><div class="lbl">Total de rodadas</div><div class="val">${TOTAL}</div></div>
+  </div>
+</div>
+<div class="section"><h3>Histórico de Questões</h3>
+  <table><thead><tr>
+    <th style="width:34px">#</th><th style="width:110px">Tema</th>
+    <th>Questão</th><th style="width:70px;text-align:center">Resposta</th>
+    <th style="width:38px;text-align:center">Res.</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+</div>
+<div class="section"><h3>Alinhamento BNCC</h3>
+  <div class="bncc">
+    <span class="code">${BNCC.codigo}</span>
+    <div class="bt"><strong>Unidade:</strong> ${BNCC.unidade} · <strong>Ano:</strong> ${BNCC.ano}</div>
+    <div class="bt"><strong>Objeto:</strong> ${BNCC.objeto}</div>
+    <div class="bt"><strong>Habilidade:</strong> ${BNCC.habilidade}</div>
+  </div>
+</div>
+<div class="signature">
+  <div class="sign-box">Assinatura do(a) Aluno(a)<br><strong>${studentName}</strong></div>
+  <div class="sign-box">Prof. Regente<br><strong>Lillian Tavares</strong></div>
+</div>
+<div class="footer-p">
+  <strong>${CREDITS.nome}</strong><br>
+  ${CREDITS.curso} · ${CREDITS.disciplina}<br>
+  ${CREDITS.orientador} · ${CREDITS.regente}<br>
+  ${CREDITS.nivel} · BNCC: ${BNCC.codigo}
+</div>
+<script>window.onload=()=>window.print()<\/script>
+</body></html>`);
+  win.document.close();
+}
+
+// ── TELA HISTÓRICO ────────────────────────────────────────────
+function TelaHistorico({onBack}){
+  const[historico,setHistorico]=useState(loadHistorico());
+  const[confirmando,setConfirmando]=useState(false);
+  function limpar(){setConfirmando(true);}
+  function confirmarLimpar(){clearHistorico();setHistorico([]);setConfirmando(false);}
+  function cancelarLimpar(){setConfirmando(false);}
+  const BG="linear-gradient(135deg,#0a0612,#1a0a2e,#0a0612)";
+  return(
+    <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",padding:16,position:"relative",zIndex:1}}>
+      <div style={{width:"100%",maxWidth:480}} className="slide-up">
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+          <button onClick={onBack} style={{background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:9,padding:"7px 13px",color:"#a78bfa",fontSize:13,cursor:"pointer",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>← Voltar</button>
+          <h2 style={{color:"#fff",fontSize:18,fontWeight:900,flex:1,fontFamily:"'Syne',sans-serif"}}>📊 Histórico de Alunos</h2>
+          {historico.length>0&&<button onClick={limpar} style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:9,padding:"6px 12px",color:"#f87171",fontSize:11,cursor:"pointer",fontWeight:700}}>🗑️ Limpar</button>}
+        </div>
+
+        {/* MODAL CONFIRMAÇÃO */}
+        {confirmando&&(
+          <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}}>
+            <div style={{background:"#1a0a2e",border:"1px solid rgba(248,113,113,0.4)",borderRadius:16,padding:24,maxWidth:300,width:"90%",textAlign:"center"}}>
+              <div style={{fontSize:40,marginBottom:10}}>🗑️</div>
+              <p style={{color:"#fff",fontSize:15,fontWeight:700,marginBottom:8,fontFamily:"'Syne',sans-serif"}}>Apagar histórico?</p>
+              <p style={{color:"#666",fontSize:12,marginBottom:18}}>Esta ação não pode ser desfeita. Todos os registros serão apagados.</p>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={cancelarLimpar} style={{flex:1,padding:"10px",borderRadius:10,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#666",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+                <button onClick={confirmarLimpar} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:"#f87171",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Apagar tudo</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {historico.length===0?(
+          <div style={{textAlign:"center",padding:"40px 20px"}}>
+            <div style={{fontSize:48,marginBottom:12}}>📭</div>
+            <p style={{fontSize:14,color:"#555"}}>Nenhuma sessão registrada ainda.</p>
+            <p style={{fontSize:12,marginTop:6,color:"#444"}}>Jogue uma partida para ver o histórico aqui!</p>
+          </div>
+        ):(
+          <>
+            {/* RANKING */}
+            <div style={{background:"rgba(167,139,250,0.05)",border:"1px solid rgba(167,139,250,0.15)",borderRadius:14,padding:14,marginBottom:14}}>
+              <p style={{color:"#a78bfa",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10,fontFamily:"'Syne',sans-serif"}}>🏆 Ranking de Pontuação</p>
+              {[...historico].sort((a,b)=>b.finalScore-a.finalScore).slice(0,10).map((s,i)=>{
+                const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+                const nota=((s.correctCount/s.TOTAL)*10).toFixed(1);
+                return(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<Math.min(historico.length,10)-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                    <span style={{width:24,textAlign:"center",fontSize:14}}>{medal||`${i+1}º`}</span>
+                    <div style={{flex:1}}>
+                      <div style={{color:"#e2e8f0",fontSize:13,fontWeight:700}}>{s.studentName}</div>
+                      <div style={{color:"#444",fontSize:10}}>{s.date} · Nível {s.levelName}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{color:"#fbbf24",fontSize:14,fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.finalScore} pts</div>
+                      <div style={{color:"#555",fontSize:10}}>Nota {nota} · {s.correctCount}/{s.TOTAL} ✅</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* SESSÕES */}
+            <p style={{color:"#a78bfa",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:"'Syne',sans-serif"}}>📋 Sessões Recentes</p>
+            {[...historico].reverse().map((s,i)=>{
+              const nota=((s.correctCount/s.TOTAL)*10).toFixed(1);
+              const pct=Math.round((s.correctCount/s.TOTAL)*100);
+              return(
+                <div key={i} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:13,padding:13,marginBottom:9}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{color:"#fff",fontSize:14,fontWeight:700}}>{s.studentName}</div>
+                      <div style={{color:"#444",fontSize:10}}>{s.date} · Nível {s.levelName}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{color:"#fbbf24",fontSize:16,fontWeight:900,fontFamily:"'Syne',sans-serif"}}>{s.finalScore} pts</div>
+                      <div style={{color:"#555",fontSize:10}}>Nota {nota}/10</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                    <span style={{background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:99,padding:"2px 10px",color:"#a78bfa",fontSize:11,fontWeight:700}}>{s.correctCount} acertos</span>
+                    <span style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:99,padding:"2px 10px",color:"#f87171",fontSize:11,fontWeight:700}}>{s.wrongCount} erros</span>
+                    <span style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:99,padding:"2px 10px",color:"#fbbf24",fontSize:11,fontWeight:700}}>{pct}%</span>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                    {s.history.map((h,j)=>(
+                      <div key={j} style={{width:26,height:26,borderRadius:6,background:h.result==="correct"?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.15)",border:`1px solid ${h.result==="correct"?"#a78bfa":"#f87171"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11}}>
+                        {h.result==="correct"?"✅":"❌"}
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={()=>doPrint({...s,selTemas:s.selTemas||["area","perimetro","angulos","figuras"]})}
+                    style={{width:"100%",padding:"8px",borderRadius:9,border:"1px solid rgba(167,139,250,0.25)",background:"rgba(167,139,250,0.07)",color:"#a78bfa",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+                    🖨️ Imprimir Resultado desta Sessão
+                  </button>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── COMPONENTES ───────────────────────────────────────────────
+function Footer(){
+  return(
+    <footer style={{width:"100%",maxWidth:520,marginTop:18,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,paddingBottom:8,textAlign:"center",position:"relative",zIndex:1}}>
+      <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"center"}}>
+        <span style={{color:"#a78bfa",fontSize:12,fontWeight:700,fontFamily:"'Syne',sans-serif"}}>👩‍🎓 {CREDITS.nome}</span>
+        <span style={{color:"#444",fontSize:10}}>{CREDITS.curso} &nbsp;·&nbsp; {CREDITS.disciplina}</span>
+        <span style={{color:"#444",fontSize:10}}>{CREDITS.orientador} &nbsp;·&nbsp; {CREDITS.regente}</span>
+        <span style={{color:"#333",fontSize:9}}>{CREDITS.nivel} &nbsp;·&nbsp; BNCC: {BNCC.codigo}</span>
+      </div>
+    </footer>
+  );
+}
+
+// ── APP ────────────────────────────────────────────────────────
+function App(){
+  const[screen,setScreen]=useState("menu");
+  const[level,setLevel]=useState(0);
+  const[selTemas,setSelTemas]=useState(["area","perimetro","angulos","figuras"]);
+  const[question,setQuestion]=useState(null);
+  const[score,setScore]=useState(0);
+  const[livesLeft,setLivesLeft]=useState(3);
+  const[round,setRound]=useState(0);
+  const[timeLeft,setTimeLeft]=useState(45);
+  const[feedback,setFeedback]=useState(null);
+  const[answered,setAnswered]=useState(false);
+  const[streak,setStreak]=useState(0);
+  const[maxStreak,setMaxStreak]=useState(0);
+  const[bestScore,setBestScore]=useState(0);
+  const TOTAL=10;
+  const[studentName,setStudentName]=useState("");
+  const[correctCount,setCorrectCount]=useState(0);
+  const[wrongCount,setWrongCount]=useState(0);
+  const[finalScore,setFinalScore]=useState(0);
+  const[showBncc,setShowBncc]=useState(false);
+  const[history,setHistory]=useState([]);
+  const[sessionDate,setSessionDate]=useState("");
+  const[shake,setShake]=useState(false);
+
+  const pickQ=useCallback(()=>{
+    const tema=selTemas[ri(0,selTemas.length-1)];
+    return gerarQuestao(level,tema);
+  },[level,selTemas]);
+
+  useEffect(()=>{
+    if(screen!=="game"||answered)return;
+    if(timeLeft<=0){handleAnswer(null);return;}
+    const t=setTimeout(()=>setTimeLeft(v=>v-1),1000);
+    return()=>clearTimeout(t);
+  },[timeLeft,screen,answered]);
+
+  function startGame(){
+    if(!studentName.trim()||selTemas.length===0)return;
+    setScore(0);setLivesLeft(3);setRound(0);setStreak(0);setMaxStreak(0);
+    setCorrectCount(0);setWrongCount(0);setHistory([]);
+    const now=new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    setSessionDate(now);
+    const q=pickQ();setQuestion(q);setTimeLeft(LEVELS[level].timeLimit);
+    setFeedback(null);setAnswered(false);setScreen("game");
+  }
+
+  function handleAnswer(choice){
+    if(answered)return;
+    setAnswered(true);
+    const ok=choice!==null&&choice===question.resposta;
+    let ns=score,nl=livesLeft,nst=streak,nms=maxStreak,nc=correctCount,nw=wrongCount;
+    if(ok){nst++;if(nst>nms)nms=nst;const bonus=nst>=3?Math.floor(LEVELS[level].points*0.5):0;ns+=LEVELS[level].points+bonus;nc++;setFeedback("correct");}
+    else{nst=0;nl--;nw++;setFeedback("wrong");setShake(true);setTimeout(()=>setShake(false),500);}
+    setStreak(nst);setMaxStreak(nms);setScore(ns);setLivesLeft(nl);setCorrectCount(nc);setWrongCount(nw);
+    const newHist=[...history,{...question,result:ok?"correct":"wrong"}];
+    setHistory(newHist);
+    setTimeout(()=>{
+      const nr=round+1;
+      if(nr>=TOTAL||nl<=0){
+        setBestScore(b=>Math.max(b,ns));setFinalScore(ns);
+        const sessao={studentName,finalScore:ns,correctCount:nc,wrongCount:nw,maxStreak:nms,level,levelName:LEVELS[level].name,selTemas,history:newHist,TOTAL,date:sessionDate};
+        const hist=loadHistorico();hist.push(sessao);saveHistorico(hist);
+        setScreen("result");
+      }else{setRound(nr);const q=pickQ();setQuestion(q);setTimeLeft(LEVELS[level].timeLimit);setFeedback(null);setAnswered(false);}
+    },1500);
+  }
+
+  function toggleTema(t){setSelTemas(ts=>ts.includes(t)?(ts.length>1?ts.filter(x=>x!==t):ts):[...ts,t]);}
+  function copyLink(){navigator.clipboard.writeText(window.location.href).then(()=>alert("✅ Link copiado! Compartilhe com seus alunos 😊"));}
+
+  if(screen==="historico") return <TelaHistorico onBack={()=>setScreen("menu")}/>;
+
+  const tInfo=question?TEMAS.find(t=>t.id===question.tema):null;
+  const timerPct=question?(timeLeft/LEVELS[level].timeLimit)*100:100;
+  const timerCol=timerPct>50?"#a78bfa":timerPct>25?"#fbbf24":"#f87171";
+  const canStart=studentName.trim()&&selTemas.length>0;
+  const BG="linear-gradient(135deg,#0a0612 0%,#1a0a2e 50%,#0a0612 100%)";
+  const base={minHeight:"100vh",background:BG,fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",padding:16,position:"relative",zIndex:1};
+
+  // ══ MENU ══════════════════════════════════════════════════
+  if(screen==="menu") return(
+    <div style={{...base,justifyContent:"center"}}>
+      <div style={{width:"100%",maxWidth:480,textAlign:"center"}} className="slide-up">
+
+        {/* VERSÍCULOS */}
+        <div style={{background:"linear-gradient(135deg,rgba(124,58,237,0.08),rgba(167,139,250,0.05))",border:"1px solid rgba(167,139,250,0.2)",borderRadius:16,padding:16,marginBottom:16,textAlign:"left"}}>
+          <p style={{color:"#c4b5fd",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12,textAlign:"center",fontFamily:"'Syne',sans-serif"}}>✝️ Deus é tudo que nos temos</p>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {VERSICULOS.map((v,i)=>(
+              <div key={i} style={{borderLeft:"2px solid rgba(167,139,250,0.5)",paddingLeft:12}}>
+                <p style={{color:"#ddd6fe",fontSize:12,lineHeight:1.7,margin:"0 0 4px",fontStyle:"italic"}}>{v.txt}</p>
+                <p style={{color:"#a78bfa",fontSize:11,fontWeight:700,margin:0,fontFamily:"'Syne',sans-serif"}}>— {v.ref}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* TÍTULO */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:50,marginBottom:4,filter:"drop-shadow(0 0 20px rgba(167,139,250,0.5))"}}>📐</div>
+          <h1 style={{fontSize:30,fontWeight:900,color:"#fff",margin:"4px 0 2px",letterSpacing:-1,fontFamily:"'Syne',sans-serif"}}>
+            Geometria <span style={{color:"#a78bfa",textShadow:"0 0 30px rgba(167,139,250,0.6)"}}>Ninja</span>
+          </h1>
+          <p style={{color:"#555",fontSize:12,margin:0}}>8º Ano · Geometria Plana</p>
+          {bestScore>0&&<p style={{color:"#fbbf24",fontSize:11,marginTop:3}}>🏆 Recorde: {bestScore} pts</p>}
+        </div>
+
+        {/* COMPARTILHAR + HISTÓRICO */}
+        <div style={{display:"flex",gap:7,marginBottom:14}}>
+          <button onClick={copyLink} style={{flex:1,padding:"10px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#4c1d95,#7c3aed)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(124,58,237,0.35)",fontFamily:"'Syne',sans-serif"}}>
+            🔗 Copiar Link
+          </button>
+          <button onClick={()=>setScreen("historico")} style={{flex:1,padding:"10px",borderRadius:12,border:"1px solid rgba(167,139,250,0.25)",background:"rgba(167,139,250,0.07)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+            📊 Histórico ({loadHistorico().length})
+          </button>
+        </div>
+
+        {/* DESCRIÇÃO */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:12,textAlign:"left"}}>
+          <p style={{color:"#a78bfa",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:"'Syne',sans-serif"}}>📋 Sobre o Aplicativo</p>
+          <p style={{color:"#aaa",fontSize:12,lineHeight:1.75,margin:"0 0 10px"}}>O <strong style={{color:"#fff"}}>Geometria Ninja</strong> é um jogo educativo para o <strong style={{color:"#a78bfa"}}>8º Ano do Ensino Fundamental</strong>, focado em <strong style={{color:"#a78bfa"}}>Geometria Plana</strong>: área, perímetro, ângulos e figuras, com questões diretas e contextualizadas.</p>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10,marginBottom:10}}>
+            <p style={{color:"#888",fontSize:11,fontWeight:600,marginBottom:5}}>🎯 Objetivo</p>
+            <p style={{color:"#666",fontSize:11,lineHeight:1.6,margin:0}}>Calcular áreas, perímetros, ângulos e identificar figuras planas em situações do cotidiano — alinhado à <strong style={{color:"#a78bfa"}}>BNCC EF08MA15</strong>.</p>
+          </div>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10,marginBottom:10}}>
+            <p style={{color:"#888",fontSize:11,fontWeight:600,marginBottom:5}}>🕹️ Como Jogar</p>
+            {["1️⃣ Digite seu nome, escolha o nível e os temas","2️⃣ Leia a questão e escolha a resposta correta","3️⃣ Sequências de acertos geram bônus 🔥","4️⃣ Resultado salvo automaticamente no histórico"].map((t,i)=>(
+              <p key={i} style={{color:"#666",fontSize:11,lineHeight:1.6,margin:"0 0 2px"}}>{t}</p>
+            ))}
+          </div>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {[{e:"📐",l:"Área",c:"#a78bfa"},{e:"📏",l:"Perímetro",c:"#34d399"},{e:"📐",l:"Ângulos",c:"#fbbf24"},{e:"🔷",l:"Figuras",c:"#f472b6"}].map((t,i)=>(
+                <div key={i} style={{flex:1,minWidth:70,background:`${t.c}12`,border:`1px solid ${t.c}30`,borderRadius:9,padding:"7px 6px",textAlign:"center"}}>
+                  <div style={{fontSize:14,marginBottom:2}}>{t.e}</div>
+                  <div style={{color:t.c,fontSize:10,fontWeight:700}}>{t.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* BNCC */}
+        <button onClick={()=>setShowBncc(v=>!v)} style={{background:"rgba(124,58,237,0.12)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:99,padding:"4px 14px",color:"#a78bfa",fontSize:11,fontWeight:700,cursor:"pointer",marginBottom:10,fontFamily:"'Syne',sans-serif"}}>
+          📚 BNCC {BNCC.codigo} {showBncc?"▲":"▼"}
+        </button>
+        {showBncc&&(
+          <div style={{background:"rgba(124,58,237,0.06)",border:"1px solid rgba(167,139,250,0.15)",borderRadius:12,padding:12,marginBottom:11,textAlign:"left"}}>
+            <p style={{color:"#a78bfa",fontSize:10,fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Syne',sans-serif"}}>{BNCC.campo} · {BNCC.ano}</p>
+            <p style={{color:"#666",fontSize:11,lineHeight:1.6,margin:"0 0 4px"}}><strong style={{color:"#aaa"}}>Habilidade:</strong> {BNCC.habilidade}</p>
+            <p style={{color:"#666",fontSize:11,margin:0}}><strong style={{color:"#aaa"}}>Objeto:</strong> {BNCC.objeto}</p>
+          </div>
+        )}
+
+        {/* NOME */}
+        <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:12,marginBottom:8}}>
+          <p style={{color:"#555",fontSize:10,marginBottom:5,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Nome do Aluno(a)</p>
+          <input type="text" placeholder="Digite seu nome completo..." value={studentName} onChange={e=>setStudentName(e.target.value)}
+            style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",color:"#fff",fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'DM Sans',sans-serif"}}/>
+        </div>
+
+        {/* NÍVEL */}
+        <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:12,marginBottom:8}}>
+          <p style={{color:"#555",fontSize:10,marginBottom:5,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Nível de Dificuldade</p>
+          <div style={{display:"flex",gap:6}}>
+            {LEVELS.map((l,i)=>(
+              <button key={i} onClick={()=>setLevel(i)} style={{flex:1,padding:"8px 3px",borderRadius:9,border:level===i?"2px solid #a78bfa":"2px solid transparent",background:level===i?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.03)",color:level===i?"#a78bfa":"#555",cursor:"pointer",fontWeight:700,fontSize:11,transition:"all 0.2s",fontFamily:"'Syne',sans-serif"}}>
+                {l.name}<div style={{fontSize:8,marginTop:1,opacity:.7,fontFamily:"'DM Sans',sans-serif"}}>{l.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* TEMAS */}
+        <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:12,marginBottom:14}}>
+          <p style={{color:"#555",fontSize:10,marginBottom:5,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Temas de Geometria</p>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {TEMAS.map(t=>(
+              <button key={t.id} onClick={()=>toggleTema(t.id)} style={{flex:1,minWidth:90,padding:"9px 4px",borderRadius:9,border:selTemas.includes(t.id)?`2px solid ${t.color}`:"2px solid transparent",background:selTemas.includes(t.id)?`${t.color}15`:"rgba(255,255,255,0.03)",color:selTemas.includes(t.id)?t.color:"#555",cursor:"pointer",fontWeight:700,fontSize:13,transition:"all 0.2s",boxShadow:selTemas.includes(t.id)?`0 0 12px ${t.color}25`:"none"}}>
+                {t.emoji}<div style={{fontSize:9,marginTop:1,fontFamily:"'DM Sans',sans-serif"}}>{t.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={startGame} disabled={!canStart} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:canStart?"linear-gradient(135deg,#4c1d95,#7c3aed,#a78bfa)":"rgba(124,58,237,0.15)",color:canStart?"#fff":"#333",fontSize:15,fontWeight:900,cursor:canStart?"pointer":"not-allowed",boxShadow:canStart?"0 8px 28px rgba(124,58,237,0.4)":"none",fontFamily:"'Syne',sans-serif",transition:"all 0.3s"}}>
+          📐 Começar Jogo
+        </button>
+        {!studentName.trim()&&<p style={{color:"#f87171",fontSize:10,marginTop:5}}>⚠️ Digite seu nome para começar</p>}
+        <p style={{color:"#333",fontSize:10,marginTop:5}}>{TOTAL} rodadas · {LEVELS[level].timeLimit}s por questão · 💾 salvo automaticamente</p>
+      </div>
+      <Footer/>
+    </div>
+  );
+
+  // ══ RESULTADO ═════════════════════════════════════════════
+  if(screen==="result"){
+    const pct=Math.round((correctCount/TOTAL)*100);
+    const nota=(correctCount/TOTAL)*10;
+    const medal=nota>=9?"🏆 Excelente!":nota>=7?"🥈 Muito Bom!":nota>=5?"🥉 Bom trabalho!":"💪 Continue tentando!";
+    const icon=nota>=9?"🏆":nota>=7?"🥈":nota>=5?"🥉":"💪";
+    return(
+      <div style={{...base,justifyContent:"center"}}>
+        <div style={{width:"100%",maxWidth:460}} className="slide-up">
+          <div style={{textAlign:"center",marginBottom:12}}>
+            <div style={{fontSize:46,marginBottom:4,filter:"drop-shadow(0 0 20px rgba(167,139,250,0.5))"}}>{icon}</div>
+            <h2 style={{color:"#fff",fontSize:21,fontWeight:900,margin:"0 0 3px",fontFamily:"'Syne',sans-serif"}}>{medal}</h2>
+            <p style={{color:"#a78bfa",fontSize:13,fontWeight:700}}>👤 {studentName}</p>
+            <p style={{color:"#444",fontSize:11}}>Nível {LEVELS[level].name} · BNCC {BNCC.codigo}</p>
+            <p style={{color:"#a78bfa",fontSize:11,marginTop:3}}>💾 Sessão salva no histórico!</p>
+            <p style={{color:"#444",fontSize:10}}>{sessionDate}</p>
+          </div>
+
+          {/* NOTA */}
+          <div style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)",borderRadius:16,padding:"14px 20px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{color:"rgba(255,255,255,0.6)",fontSize:9,textTransform:"uppercase",letterSpacing:1}}>Nota</div>
+              <div style={{color:"#fff",fontSize:36,fontWeight:900,lineHeight:1,fontFamily:"'Syne',sans-serif"}}>{nota.toFixed(1)}</div>
+              <div style={{color:"rgba(255,255,255,0.6)",fontSize:9}}>/10,0</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{color:"rgba(255,255,255,0.6)",fontSize:9,textTransform:"uppercase",letterSpacing:1}}>Pontuação</div>
+              <div style={{color:"#fbbf24",fontSize:26,fontWeight:900,fontFamily:"'Syne',sans-serif"}}>{finalScore} pts</div>
+              <div style={{color:"rgba(255,255,255,0.6)",fontSize:9}}>Aproveitamento: {pct}%</div>
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
+            {[
+              {label:"Acertos",value:correctCount+" ✅",color:"#a78bfa"},
+              {label:"Erros",value:wrongCount+" ❌",color:"#f87171"},
+              {label:"Sequência máx.",value:maxStreak+" 🔥",color:"#fbbf24"},
+              {label:"Recorde",value:bestScore+" pts",color:"#34d399"},
+            ].map((s,i)=>(
+              <div key={i} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:11}}>
+                <div style={{color:"#444",fontSize:9,textTransform:"uppercase",letterSpacing:1}}>{s.label}</div>
+                <div style={{color:s.color,fontSize:17,fontWeight:800,marginTop:2,fontFamily:"'Syne',sans-serif"}}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Histórico visual */}
+          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:12,marginBottom:12}}>
+            <p style={{color:"#555",fontSize:9,textTransform:"uppercase",letterSpacing:1.5,marginBottom:8}}>Questões desta sessão</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {history.map((h,i)=>(
+                <div key={i} style={{width:30,height:30,borderRadius:7,background:h.result==="correct"?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.15)",border:`1px solid ${h.result==="correct"?"#a78bfa":"#f87171"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>
+                  {h.result==="correct"?"✅":"❌"}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* BNCC */}
+          <div style={{background:"rgba(124,58,237,0.07)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:12,padding:11,marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              <span style={{background:"#7c3aed",color:"#fff",fontWeight:800,fontSize:10,padding:"2px 8px",borderRadius:99,fontFamily:"'Syne',sans-serif"}}>{BNCC.codigo}</span>
+              <span style={{color:"#a78bfa",fontSize:10,fontWeight:600}}>{BNCC.campo} · {BNCC.ano}</span>
+            </div>
+            <p style={{color:"#555",fontSize:10,lineHeight:1.5,margin:0}}>{BNCC.habilidade}</p>
+          </div>
+
+          <div style={{display:"flex",gap:7,marginBottom:7}}>
+            <button onClick={startGame} style={{flex:1,padding:11,borderRadius:11,border:"none",background:"linear-gradient(135deg,#4c1d95,#7c3aed)",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>🔄 Jogar Novamente</button>
+            <button onClick={()=>setScreen("menu")} style={{flex:1,padding:11,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"#555",fontSize:12,fontWeight:700,cursor:"pointer"}}>🏠 Menu</button>
+          </div>
+          <div style={{display:"flex",gap:7}}>
+            <button onClick={()=>doPrint({studentName,finalScore,correctCount,wrongCount,maxStreak,level,selTemas,history,TOTAL,date:sessionDate})}
+              style={{flex:2,padding:11,borderRadius:11,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"#a78bfa",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+              🖨️ Imprimir Resultado
+            </button>
+            <button onClick={()=>setScreen("historico")} style={{flex:1,padding:11,borderRadius:11,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.08)",color:"#fbbf24",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+              📊 Histórico
+            </button>
+          </div>
+        </div>
+        <Footer/>
+      </div>
+    );
+  }
+
+  // ══ JOGO ══════════════════════════════════════════════════
+  return(
+    <div style={{...base,paddingTop:10}}>
+      {/* HUD */}
+      <div style={{width:"100%",maxWidth:480,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+        <div style={{display:"flex",gap:2}}>
+          {[...Array(3)].map((_,i)=><span key={i} style={{fontSize:18,opacity:i<livesLeft?1:0.2}}>❤️</span>)}
+        </div>
+        <div style={{textAlign:"center"}}>
+          <div style={{color:"#a78bfa",fontSize:9,fontWeight:600,fontFamily:"'Syne',sans-serif"}}>👤 {studentName}</div>
+          <div style={{color:"#fbbf24",fontSize:17,fontWeight:900,lineHeight:1,fontFamily:"'Syne',sans-serif",textShadow:"0 0 20px rgba(251,191,36,0.4)"}}>{score} pts</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{color:"#555",fontSize:11,fontWeight:700,fontFamily:"'Syne',sans-serif"}}>{round+1}/{TOTAL}</div>
+          <div style={{color:"#333",fontSize:9}}>rodada</div>
+        </div>
+      </div>
+
+      {/* Timer */}
+      <div style={{width:"100%",maxWidth:480,height:4,background:"rgba(255,255,255,0.05)",borderRadius:99,marginBottom:8,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${timerPct}%`,background:timerCol,borderRadius:99,transition:"width 1s linear",boxShadow:`0 0 8px ${timerCol}80`}}/>
+      </div>
+
+      {streak>=2&&(
+        <div style={{background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:99,padding:"3px 12px",color:"#fbbf24",fontSize:11,fontWeight:700,marginBottom:7,fontFamily:"'Syne',sans-serif"}}>
+          🔥 Sequência: {streak}x {streak>=3?`· +${Math.floor(LEVELS[level].points*0.5)} bônus!`:""}
+        </div>
+      )}
+
+      {question&&(
+        <div style={{width:"100%",maxWidth:480,flex:1,display:"flex",flexDirection:"column"}}>
+          {/* Badges */}
+          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:6}}>
+            {tInfo&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:4,background:`${tInfo.color}12`,border:`1px solid ${tInfo.color}30`,borderRadius:99,padding:"2px 10px"}}>
+                <span style={{fontSize:10}}>{tInfo.emoji}</span>
+                <span style={{color:tInfo.color,fontSize:10,fontWeight:700,fontFamily:"'Syne',sans-serif"}}>{tInfo.label}</span>
+              </div>
+            )}
+            {question.tipo==="problem"&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:3,background:"rgba(52,211,153,0.08)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:99,padding:"2px 8px"}}>
+                <span style={{fontSize:9}}>📖</span>
+                <span style={{color:"#34d399",fontSize:9,fontWeight:700}}>Problema</span>
+              </div>
+            )}
+            <div style={{marginLeft:"auto",color:timerCol,fontSize:13,fontWeight:800,fontFamily:"'Syne',sans-serif",textShadow:`0 0 10px ${timerCol}80`}}>⏱ {timeLeft}s</div>
+          </div>
+
+          {/* Card questão */}
+          <div className={shake?"shake":""} style={{background:"rgba(255,255,255,0.04)",border:feedback==="correct"?`2px solid #a78bfa`:feedback==="wrong"?`2px solid #f87171`:`1px solid rgba(255,255,255,0.07)`,borderRadius:20,padding:"18px 15px",marginBottom:10,textAlign:"center",transition:"border-color 0.3s",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",boxShadow:feedback==="correct"?"0 0 30px rgba(167,139,250,0.2)":feedback==="wrong"?"0 0 30px rgba(248,113,113,0.15)":"none"}}>
+            <div style={{fontSize:36,marginBottom:10,filter:`drop-shadow(0 0 12px ${tInfo?.color||"#a78bfa"}50)`}}>{question.emoji}</div>
+            <p style={{color:"#ccc",fontSize:14,lineHeight:1.75,margin:"0 0 10px"}}>{question.enunciado}</p>
+            {feedback&&(
+              <div style={{marginTop:8,fontSize:12,fontWeight:700,color:feedback==="correct"?"#a78bfa":"#f87171",fontFamily:"'Syne',sans-serif"}}>
+                {feedback==="correct"?"✅ Correto! Muito bem!":`❌ Resposta: ${question.resposta}`}
+              </div>
+            )}
+          </div>
+
+          {/* Alternativas */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:5}}>
+            {question.choices.map((c,i)=>{
+              const isC=c===question.resposta;
+              let bg="rgba(255,255,255,0.04)",border="1px solid rgba(255,255,255,0.08)";
+              if(answered&&isC){bg="rgba(167,139,250,0.2)";border="2px solid #a78bfa";}
+              if(answered&&!isC){bg="rgba(248,113,113,0.06)";border="1px solid rgba(248,113,113,0.15)";}
+              return(
+                <button key={i} onClick={()=>handleAnswer(c)} disabled={answered}
+                  style={{padding:"16px 8px",borderRadius:13,border,background:bg,color:answered&&isC?"#a78bfa":"#ccc",fontSize:17,fontWeight:900,cursor:answered?"default":"pointer",transition:"all 0.2s",fontFamily:"'Syne',sans-serif",boxShadow:answered&&isC?"0 0 20px rgba(167,139,250,0.3)":"none"}}>
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <Footer/>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
